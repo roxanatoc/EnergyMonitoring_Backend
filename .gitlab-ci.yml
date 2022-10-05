@@ -1,0 +1,49 @@
+stages:
+  - build
+  - deploy
+
+build:
+  image: docker:latest
+  services:
+    - docker:dind
+  stage: build
+  script:
+    - docker login -u $CI_DEPLOY_USER -p $CI_DEPLOY_PASSWORD $CI_REGISTRY
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA --tag $CI_REGISTRY_IMAGE:latest .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker push $CI_REGISTRY_IMAGE:latest
+
+variables:
+    DB_IP: ec2-99-81-177-233.eu-west-1.compute.amazonaws.com
+    DB_PORT: 5432
+    DB_USER: elcqotrarqtowz
+    DB_PASSWORD: 9f82a0b36f61bcc07e87d71a327abe02a32008edd84d7acbe5d9c2f509e20d20
+    DB_DBNAME: d5rqbh690k357q
+
+deploy:
+  image: docker:latest
+  services:
+    - docker:dind
+  stage: deploy
+  only:
+    - main
+  script:
+    - docker login -u $CI_DEPLOY_USER -p $CI_DEPLOY_PASSWORD $CI_REGISTRY
+    - docker pull $CI_REGISTRY_IMAGE:latest
+    - docker tag $CI_REGISTRY_IMAGE:latest $HEROKU_REGISTRY_IMAGE:latest
+    - docker login --username=_ --password=$HEROKU_API_KEY $HEROKU_REGISTRY
+    - docker push $HEROKU_REGISTRY_IMAGE:latest
+    - docker run --rm -e HEROKU_API_KEY=$HEROKU_API_KEY wingrunr21/alpine-heroku-cli container:release web --app spring-demo-ds2021-roxana1
+
+
+#deploy:
+#  stage: deploy
+#  image: ruby:2.4
+#  script:
+#    - apt-get update -qy
+#    - apt-get install -y ruby-dev
+#    - gem install dpl
+#    - dpl --provider=heroku --app=spring-demo-ds2021-roxana1 --api-key=$HEROKU_API_KEY
+#  only:
+#    - main
